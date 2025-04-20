@@ -107,4 +107,12 @@ class Node {
       }
     });
   }
+
+  bool canAcceptTask(Task task) {
+    bool typeMatch = task.taskClass == nodeClass ||
+        task.taskClass == NodeClass.generic ||
+        nodeClass == NodeClass.generic;
+    bool cpuMatch = busyCores + task.cpuCores <= cpuCores;
+    return typeMatch && cpuMatch;
+  }
 }
