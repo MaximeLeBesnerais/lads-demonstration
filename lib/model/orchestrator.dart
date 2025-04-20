@@ -19,6 +19,15 @@ class Orchestrator {
     nodes.add(Node(name, name, cpuCores, nodeClass: nodeClass));
   }
 
+  void standbyNode(Node node) {
+    if (node.nodeState == NodeState.inactive) {
+      logs.add('Node ${node.name} is already in standby');
+      return;
+    }
+    node.nodeState = NodeState.inactive;
+    logs.add('Node ${node.name} is now in standby');
+  }
+
   void addTask(Task task) {
     if (task.cpuCores <= 0) {
       throw ArgumentError('Cpu cores must be greater than 0');
