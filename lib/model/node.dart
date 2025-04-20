@@ -1,20 +1,8 @@
 import 'dart:async';
 
-enum NodeClass {
-  backup,
-  compute,
-  storage,
-  network,
-  database,
-  generic,
-}
+enum NodeClass { backup, compute, storage, network, database, generic }
 
-enum NodeState {
-  active,
-  inactive,
-  maintenance,
-  decommissioned
-}
+enum NodeState { active, inactive, maintenance, decommissioned }
 
 class Task {
   String name;
@@ -24,7 +12,13 @@ class Task {
   NodeClass taskClass = NodeClass.generic;
   Function? onComplete;
 
-  Task(this.name, this.taskLength, this.cpuCores, {this.taskClass = NodeClass.generic, this.onComplete}) {
+  Task(
+    this.name,
+    this.taskLength,
+    this.cpuCores, {
+    this.taskClass = NodeClass.generic,
+    this.onComplete,
+  }) {
     if (cpuCores <= 0) {
       throw ArgumentError('Cpu cores must be greater than 0');
     }
@@ -44,6 +38,8 @@ class Task {
 }
 
 class Node {
+  final String name;
+  final String id;
   final int cpuCores;
   int busyCores = 0;
 
@@ -54,12 +50,17 @@ class Node {
   List<Task> tasks = [];
   List<String> logs = [];
 
-  Node(this.cpuCores, {this.nodeClass = NodeClass.generic}) {
+  Node(
+    this.name,
+    this.id,
+    this.cpuCores, {
+    this.nodeClass = NodeClass.generic,
+  }) {
     if (cpuCores <= 0) {
       throw ArgumentError('Cpu cores must be greater than 0');
     }
   }
-  
+
   void repurpose(NodeClass newClass, bool hierarchical) {
     nodeClass = newClass;
     if (hierarchical) {
@@ -92,7 +93,10 @@ class Node {
     if (busyCores + task.cpuCores > cpuCores) {
       throw ArgumentError('Not enough CPU cores available');
     }
-    task.id = tasks.isEmpty ? 0 : tasks.map((t) => t.id).fold(0, (a, b) => a > b ? a : b) + 1;
+    task.id =
+        tasks.isEmpty
+            ? 0
+            : tasks.map((t) => t.id).fold(0, (a, b) => a > b ? a : b) + 1;
     tasks.add(task);
     busyCores += task.cpuCores;
     logs.add('Task ${task.name} added with id ${task.id}');
