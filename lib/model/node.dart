@@ -41,6 +41,7 @@ class Node {
   final String name;
   final String id;
   final int cpuCores;
+  NodeState state = NodeState.active;
   int busyCores = 0;
 
   Node? parent;
@@ -59,6 +60,10 @@ class Node {
     if (cpuCores <= 0) {
       throw ArgumentError('Cpu cores must be greater than 0');
     }
+  }
+
+  int get availableCores {
+    return cpuCores - busyCores;
   }
 
   void repurpose(NodeClass newClass, bool hierarchical) {
@@ -109,10 +114,11 @@ class Node {
   }
 
   bool canAcceptTask(Task task) {
-    bool typeMatch = task.taskClass == nodeClass ||
+    bool typeMatch =
+        task.taskClass == nodeClass ||
         task.taskClass == NodeClass.generic ||
         nodeClass == NodeClass.generic;
-    bool cpuMatch = busyCores + task.cpuCores <= cpuCores;
+    bool cpuMatch = availableCores >= task.cpuCores;
     return typeMatch && cpuMatch;
   }
 }
