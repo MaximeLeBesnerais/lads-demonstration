@@ -1,76 +1,39 @@
 import 'package:flutter/material.dart';
-// import 'package:lads/core/command_processor.dart';
-// import 'package:lads/model/orchestrator.dart';
-// import 'package:lads/services/ai.dart';
-// import 'package:lads/services/cli_service.dart';
+import 'package:lads/ui/providers/orchestrator_provider.dart';
+import 'package:lads/ui/screens/home_screen.dart';
+import 'package:provider/provider.dart';
 
-void main(List<String> args) {
-  // GeminiService geminiService = GeminiService();
-  // Orchestrator orchestrator = Orchestrator();
-  // CommandProcessor commandProcessor = CommandProcessor(orchestrator, geminiService);
-  // CliService cliService = CliService(commandProcessor);
-  
+void main() {
+  // No need to instantiate Orchestrator etc. here for the UI,
+  // the provider will handle the singleton.
+
   runApp(const MyApp());
 }
-
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Orchestrator UI',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      home: const MyHomePage(title: 'Orchestrator Home Page'),
-    );
-  }
-}
-
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      _counter++;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.title),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text('UI Mode Active. Counter:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
+    // Wrap the entire app with ChangeNotifierProvider
+    return ChangeNotifierProvider(
+      create: (context) => OrchestratorProvider(),
+      child: MaterialApp(
+        title: 'Orchestrator HUD',
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: Colors.deepPurple,
+            brightness: Brightness.dark, // Use a dark theme for HUD style
+          ),
+          useMaterial3: true,
+          // Define a slightly more HUD-like font if desired
+          // fontFamily: 'YourMonospaceFont', // e.g., Roboto Mono
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
+        debugShowCheckedModeBanner: false, // Hide debug banner
+        home: const HomeScreen(), // Start with the new HomeScreen
       ),
     );
   }
 }
+
+// Removed the old MyHomePage StatefulWidget as it's replaced by HomeScreen
