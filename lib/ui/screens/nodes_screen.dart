@@ -84,7 +84,10 @@ class _NodesScreenState extends State<NodesScreen> {
              ),
            ),
          ],
-         backgroundColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+        //  backgroundColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.5,
+        ),
          elevation: 1,
       ),
       body: showTwoPanes
