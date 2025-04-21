@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:math';
+
 import 'package:lads/model/node.dart';
+// Ensure this path correctly points to your updated node.dart file
 
 class Orchestrator {
   static final Orchestrator _instance = Orchestrator._internal();
@@ -12,6 +14,7 @@ class Orchestrator {
 
   List<Node> nodes = [];
   List<Task> tasksQueue = [];
+  // Consider replacing List<String> with your custom Log class instance
   List<String> logs = [];
   final Random _random = Random();
 
@@ -57,7 +60,7 @@ class Orchestrator {
     );
     nodes.add(newNode);
     _log(
-      'Node ${newNode.name} (ID: ${newNode.id}) built with ${newNode.cpuCores} cores and class ${newNode.nodeClass}. Initial state: ${newNode.nodeState}',
+      'Node ${newNode.name} (ID: ${newNode.id}) built with ${newNode.cpuCores} cores and class ${newNode.nodeClass.name}. Initial state: ${newNode.nodeState.name}',
     );
   }
 
@@ -65,25 +68,38 @@ class Orchestrator {
     try {
       return nodes.firstWhere(
         (node) => node.name == name,
-        orElse: () => throw StateError("Not found"),
       );
     } catch (e) {
+      // firstWhere throws StateError if no element is found without orElse
       return null;
     }
   }
 
   Node? findNodeById(String id) {
+    Node? node;
     try {
-      return nodes.firstWhere(
-        (node) => node.id.toUpperCase() == id.toUpperCase(),
-        orElse: () => throw StateError("Not found"),
+      node = nodes.firstWhere(
+        (node) => node.id == id,
       );
     } catch (e) {
-      return null;
+      node = null;
     }
+    if (node == null) {
+      try {
+        node = nodes.firstWhere(
+          (node) => node.name == id,
+        );
+      } catch (e) {
+        node = null;
+      }
+    }
+    if (node == null) {
+      _log('Error: Node with ID "$id" not found.');
+    }
+    return node;
   }
 
-  void removeNode(String nodeId, {bool forceRemove = false}) {
+  Future<void> removeNode(String nodeId, {bool forceRemove = false}) async {
     Node? nodeToRemove = findNodeById(nodeId);
 
     if (nodeToRemove == null) {
@@ -91,20 +107,38 @@ class Orchestrator {
       return;
     }
 
-    if (!forceRemove && nodeToRemove.nodeState != NodeState.decommissioned) {
-      _log(
-        'Error: Cannot remove node ${nodeToRemove.name} (ID: $nodeId). It must be in decommissioned state first (current state: ${nodeToRemove.nodeState}). Use forceRemove=true to override.',
-      );
-      return;
-    }
+    if (!forceRemove) {
+        if (nodeToRemove.nodeState != NodeState.decommissioned) {
+             _log('Error: Node ${nodeToRemove.name} (ID: $nodeId) must be decommissioned first. Attempting decommissioning...');
+             await setNodeStateDecommissioned(nodeId);
+             // Re-check state after attempting decommission
+             nodeToRemove = findNodeById(nodeId); // Re-fetch in case it was somehow removed
+             if (nodeToRemove == null || nodeToRemove.nodeState != NodeState.decommissioned) {
+                 _log('Error: Failed to decommission node $nodeId. Cannot remove.');
+                 return;
+             }
+             _log('Node ${nodeToRemove.name} (ID: $nodeId) successfully decommissioned.');
+        }
+         // If already decommissioned or successfully decommissioned above
+        nodes.remove(nodeToRemove);
+        _log('Node ${nodeToRemove.name} (ID: $nodeId) removed from orchestrator management.');
 
-    nodes.remove(nodeToRemove);
-    _log(
-      'Node ${nodeToRemove.name} (ID: $nodeId) removed from orchestrator management.${forceRemove ? " (Forced)" : ""}',
-    );
+    } else { // Force remove
+        _log('Forcing removal of node ${nodeToRemove.name} (ID: $nodeId)...');
+        // Forcefully dispose tasks that might still be tracked by the node
+        for (var task in List<Task>.from(nodeToRemove.tasks)) {
+             nodeToRemove.removeTaskInternal(task.id, triggeredByDecommission: true);
+        }
+        nodeToRemove.tasks.clear();
+        nodeToRemove.taskCompletionFutures.clear(); // Use internal access for force removal if needed, or add public method to Node
+        nodes.remove(nodeToRemove);
+        _log('Node ${nodeToRemove.name} (ID: $nodeId) forcefully removed.');
+    }
   }
 
-  Future<void> _setNodeState(String nodeId, NodeState targetState) async {
+
+  /// Internal helper, unchanged but relies on updated Node.setState
+  Future<void> setNodeState(String nodeId, NodeState targetState) async {
     Node? node = findNodeById(nodeId);
     if (node == null) {
       _log(
@@ -114,91 +148,99 @@ class Orchestrator {
     }
     try {
       _log(
-        'Attempting to set node ${node.name} (ID: $nodeId) state to $targetState...',
+        'Attempting to set node ${node.name} (ID: $nodeId) state to ${targetState.name}...',
       );
+      // Node.setState now handles waiting based on task futures from task.start()
       List<String> transitionLogs = await node.setState(targetState);
+      // Add logs from the node to the orchestrator logs (or your custom log handler)
       logs.addAll(
         transitionLogs.map((l) => '[Node: ${node.name} ID: ${node.id}] $l'),
       );
       _log(
-        'State transition attempt for node ${node.name} (ID: $nodeId) to $targetState finished.',
+        'State transition attempt for node ${node.name} (ID: $nodeId) to ${targetState.name} finished.',
       );
     } catch (e) {
       _log(
-        'Exception during state transition for node ${node.name} (ID: $nodeId) to $targetState: $e',
+        'Exception during state transition for node ${node.name} (ID: $nodeId) to ${targetState.name}: $e',
       );
     }
   }
 
+  // Public state change methods remain the same interface
   Future<void> setNodeStateActive(String nodeId) async {
-    await _setNodeState(nodeId, NodeState.active);
+    await setNodeState(nodeId, NodeState.active);
   }
 
   Future<void> setNodeStateInactive(String nodeId) async {
-    await _setNodeState(nodeId, NodeState.inactive);
+    await setNodeState(nodeId, NodeState.inactive);
   }
 
   Future<void> setNodeStateMaintenance(String nodeId) async {
-    await _setNodeState(nodeId, NodeState.maintenance);
+    await setNodeState(nodeId, NodeState.maintenance);
   }
 
   Future<void> setNodeStateDecommissioned(String nodeId) async {
-    await _setNodeState(nodeId, NodeState.decommissioned);
+    await setNodeState(nodeId, NodeState.decommissioned);
   }
 
+  /// Adds task to the queue. Node.addTask handles the new start logic.
   void addTask(Task task) {
+    // Validation remains the same
     if (task.cpuCores <= 0) {
-      _log(
-        'Error adding task "${task.name}": CPU cores must be greater than 0.',
-      );
+      _log('Error adding task "${task.name}": CPU cores must be greater than 0.');
       throw ArgumentError('CPU cores must be greater than 0');
     }
-    if (task.taskLength.isNegative) {
-      _log(
-        'Error adding task "${task.name}": Task duration must be non-negative.',
-      );
+    // Access initialTaskLength now
+    if (task.initialTaskLength.isNegative) {
+      _log('Error adding task "${task.name}": Task duration must be non-negative.');
       throw ArgumentError('Task duration must be non-negative');
     }
     tasksQueue.add(task);
     _log('Task "${task.name}" added to the queue.');
   }
 
+  /// Processes queue. Node.addTask now handles starting the task timer.
   void processTasks() {
     if (tasksQueue.isEmpty) {
-      return;
+      return; // No tasks to process
     }
 
     _log('Processing task queue (${tasksQueue.length} tasks)...');
     List<Task> processedTasks = [];
+    // Iterate over a copy in case of modification during iteration (less likely now)
     List<Task> queueCopy = List.from(tasksQueue);
 
     for (var task in queueCopy) {
       final node = _matchTaskToNode(task);
       if (node != null) {
         try {
-          node.addTask(
-            task,
-          );
+          // Node.addTask now internally calls task.start()
+          node.addTask(task);
+          // Orchestrator log confirms assignment, node logs confirm execution start
           _log(
             'Task "${task.name}" assigned to node ${node.name} (ID: ${node.id}).',
           );
           processedTasks.add(task);
         } catch (e) {
+          // Catch errors from node.addTask (e.g., node became inactive, start failed)
           _log(
-            'Error assigning task "${task.name}" to node ${node.name} (ID: ${node.id}): $e',
+            'Error assigning/starting task "${task.name}" on node ${node.name} (ID: ${node.id}): $e',
           );
+          // Optionally, decide whether to keep the task in the queue or discard it
         }
       } else {
+        // Log remains the same
         _log(
           'No available or suitable node found for task "${task.name}". It remains in the queue.',
         );
       }
     }
 
+    // Remove processed tasks from the main queue
     tasksQueue.removeWhere((task) => processedTasks.contains(task));
     if (processedTasks.isNotEmpty) {
       _log(
-        'Finished processing task queue. ${processedTasks.length} tasks assigned.',
+        'Finished processing task queue. ${processedTasks.length} tasks assigned/started.',
       );
     } else if (queueCopy.isNotEmpty) {
       _log(
@@ -207,6 +249,7 @@ class Orchestrator {
     }
   }
 
+  /// Matching logic remains the same, relies on Node.canAcceptTask
   Node? _matchTaskToNode(Task task) {
     for (var node in nodes) {
       if (node.canAcceptTask(task)) {
@@ -216,6 +259,7 @@ class Orchestrator {
     return null;
   }
 
+  /// Repurpose logic remains the same, relies on Node.repurpose
   void repurposeNode(
     String nodeId,
     NodeClass newClass, {
@@ -229,7 +273,7 @@ class Orchestrator {
     try {
       node.repurpose(newClass, hierarchical);
       _log(
-        'Repurpose command sent to node ${node.name} (ID: $nodeId) for class $newClass (hierarchical: $hierarchical).',
+        'Repurpose command sent to node ${node.name} (ID: $nodeId) for class ${newClass.name} (hierarchical: $hierarchical).',
       );
     } catch (e) {
       _log(
@@ -238,9 +282,12 @@ class Orchestrator {
     }
   }
 
+  // --- Logging ---
+  // Replace with calls to your custom Log class if implemented
   void _log(String message) {
     String timestamp = DateTime.now().toIso8601String();
     logs.add('[$timestamp] [Orchestrator] $message');
+    // Optional: print('[$timestamp] [Orchestrator] $message');
   }
 
   String? lastLog() {
