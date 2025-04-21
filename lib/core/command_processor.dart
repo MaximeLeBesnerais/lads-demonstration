@@ -1,21 +1,7 @@
-import 'dart:async';
+import 'package:lads/model/command_result.dart';
 import 'package:lads/model/node.dart';
 import 'package:lads/model/orchestrator.dart';
 import 'package:lads/services/ai.dart';
-
-// Result class for AI commands to carry structured data
-class AiCommandResult {
-  final String? message;
-  final List<String>? instructions;
-  final String answerType; // 'message' or 'instructions'
-
-  AiCommandResult({
-    required this.answerType,
-    this.message,
-    this.instructions,
-  });
-}
-
 
 class CommandProcessor {
   final Orchestrator orchestrator;
@@ -70,9 +56,10 @@ Example response for "what is a node?":
   CommandProcessor(this.orchestrator, this.geminiService);
 
   // --- Methods corresponding to CLI commands ---
+  // (Keep all methods like getHelpText, setApiKey, listNodes, addNode, etc., as they were)
+  // ... (Methods from previous version omitted for brevity) ...
 
   String getHelpText() {
-    // This could potentially load from a config file in the future
     StringBuffer helpBuffer = StringBuffer();
     helpBuffer.writeln('\nAvailable Commands:');
     helpBuffer.writeln('  help                     - Show this help message');
@@ -115,94 +102,59 @@ Example response for "what is a node?":
   }
 
   String addNode(List<String> args) {
-    if (args.length < 2) {
-      return 'Usage: add_node <name> <cpu_cores> [class]';
-    }
+    if (args.length < 2) { return 'Usage: add_node <name> <cpu_cores> [class]'; }
     String name = args[0];
     int? cores = int.tryParse(args[1]);
-    NodeClass nodeClass = NodeClass.generic; // Default
-    String? warning;
+    NodeClass nodeClass = NodeClass.generic; String? warning;
     if (args.length > 2) {
       try {
-        nodeClass = NodeClass.values.firstWhere(
-            (e) => e.name == args[2].toLowerCase(),
-            orElse: () => NodeClass.generic);
-        if (nodeClass == NodeClass.generic && args[2].toLowerCase() != 'generic') {
-          warning = 'Warning: Invalid node class "${args[2]}". Using generic.';
-        }
-      } catch (_) {
-        warning = 'Error parsing node class: ${args[2]}. Using generic.';
-        nodeClass = NodeClass.generic;
-      }
+        nodeClass = NodeClass.values.firstWhere((e) => e.name == args[2].toLowerCase(), orElse: () => NodeClass.generic);
+        if (nodeClass == NodeClass.generic && args[2].toLowerCase() != 'generic') { warning = 'Warning: Invalid node class "${args[2]}". Using generic.'; }
+      } catch (_) { warning = 'Error parsing node class: ${args[2]}. Using generic.'; nodeClass = NodeClass.generic; }
     }
-    if (cores == null || cores <= 0) {
-      return 'Invalid CPU cores value.';
-    }
+    if (cores == null || cores <= 0) { return 'Invalid CPU cores value.'; }
     try {
         orchestrator.buildNode(name, cores, nodeClass: nodeClass);
         String result = 'Node "$name" ($nodeClass) added.';
-        if (warning != null) {
-            result += '\n$warning';
-        }
+        if (warning != null) { result += '\n$warning'; }
         return result;
-    } catch (e) {
-        // Catch potential duplicate name error from orchestrator
-        return 'Error adding node: $e';
-    }
+    } catch (e) { return 'Error adding node: $e'; }
   }
 
    String addTask(List<String> args) {
-     if (args.length < 3) {
-       return 'Usage: add_task <name> <duration_seconds> <cpu_cores> [class]';
-     }
+     if (args.length < 3) { return 'Usage: add_task <name> <duration_seconds> <cpu_cores> [class]'; }
      String taskName = args[0];
      int? duration = int.tryParse(args[1]);
      int? taskCores = int.tryParse(args[2]);
-     NodeClass taskClass = NodeClass.generic; // Default
-     String? warning;
+     NodeClass taskClass = NodeClass.generic; String? warning;
      if (args.length > 3) {
        try {
-         taskClass = NodeClass.values.firstWhere(
-             (e) => e.name == args[3].toLowerCase(),
-             orElse: () => NodeClass.generic);
-         if (taskClass == NodeClass.generic && args[3].toLowerCase() != 'generic') {
-           warning = 'Warning: Invalid task class "${args[3]}". Using generic.';
-         }
-       } catch (_) {
-         warning = 'Error parsing task class: ${args[3]}. Using generic.';
-         taskClass = NodeClass.generic;
-       }
+         taskClass = NodeClass.values.firstWhere((e) => e.name == args[3].toLowerCase(), orElse: () => NodeClass.generic);
+         if (taskClass == NodeClass.generic && args[3].toLowerCase() != 'generic') { warning = 'Warning: Invalid task class "${args[3]}". Using generic.';}
+       } catch (_) { warning = 'Error parsing task class: ${args[3]}. Using generic.'; taskClass = NodeClass.generic; }
      }
-     if (duration == null || duration < 0 || taskCores == null || taskCores <= 0) {
-       return 'Invalid duration or CPU cores value.';
-     }
+     if (duration == null || duration < 0 || taskCores == null || taskCores <= 0) { return 'Invalid duration or CPU cores value.'; }
      try {
         orchestrator.addTask(Task(taskName, Duration(seconds: duration), taskCores, taskClass: taskClass));
         String result = 'Task "$taskName" added to queue.';
-         if (warning != null) {
-            result += '\n$warning';
-        }
+         if (warning != null) { result += '\n$warning'; }
         return result;
-     } catch (e) {
-         return 'Error adding task: $e';
-     }
+     } catch (e) { return 'Error adding task: $e'; }
    }
 
    String processTasks() {
        orchestrator.processTasks();
-       // Could return more detailed status from orchestrator logs if needed
        return 'Processing task queue requested.';
    }
 
    Node? getNodeStatus(String nodeIdOrName) {
        Node? node = orchestrator.findNodeById(nodeIdOrName.toUpperCase());
        node ??= orchestrator.findNodeByName(nodeIdOrName);
-       return node; // Return the node object or null
+       return node;
    }
 
    Future<String> setNodeState(String command, List<String> args) async {
         if (args.isEmpty) { return 'Usage: $command <node_id>'; }
-
         NodeState targetState;
         switch (command) {
           case 'active': targetState = NodeState.active; break;
@@ -211,16 +163,10 @@ Example response for "what is a node?":
           case 'decom': targetState = NodeState.decommissioned; break;
           default: return 'Internal error: Invalid state command';
         }
-
         String nodeId = args[0].toUpperCase();
         Node? node = orchestrator.findNodeById(nodeId);
-        if (node == null) {
-          return 'Node with ID "$nodeId" not found.';
-        }
-
-        // Orchestrator's setNodeState handles the async logic and logging
+        if (node == null) { return 'Node with ID "$nodeId" not found.'; }
         await orchestrator.setNodeState(node.id, targetState);
-        // We might want more detailed feedback, maybe from orchestrator logs
         return 'State change to ${targetState.name} requested for node ${node.name} ($nodeId). Check logs for details.';
    }
 
@@ -228,10 +174,7 @@ Example response for "what is a node?":
         if (args.isEmpty) { return 'Usage: remove <node_id> [force]'; }
         String nodeToRemoveId = args[0].toUpperCase();
         bool force = args.length > 1 && args[1].toLowerCase() == 'force';
-
-        // Orchestrator's removeNode handles the logic and logging
         await orchestrator.removeNode(nodeToRemoveId, forceRemove: force);
-        // Could check orchestrator logs for confirmation or errors
         return 'Removal requested for node $nodeToRemoveId. Check logs for details.';
     }
 
@@ -240,19 +183,10 @@ Example response for "what is a node?":
         String repurposeNodeId = args[0].toUpperCase();
         NodeClass newClass;
         try {
-            newClass = NodeClass.values.firstWhere(
-                (e) => e.name == args[1].toLowerCase(),
-                 orElse: () => throw FormatException("Invalid class name")
-            );
-        } catch (_) {
-            return 'Invalid node class specified: ${args[1]}\nAvailable classes: ${NodeClass.values.map((e) => e.name).join(', ')}';
-        }
-
+            newClass = NodeClass.values.firstWhere((e) => e.name == args[1].toLowerCase(), orElse: () => throw FormatException("Invalid class name"));
+        } catch (_) { return 'Invalid node class specified: ${args[1]}\nAvailable classes: ${NodeClass.values.map((e) => e.name).join(', ')}'; }
         Node? node = orchestrator.findNodeById(repurposeNodeId);
-         if (node == null) {
-           return 'Node with ID "$repurposeNodeId" not found.';
-         }
-
+         if (node == null) { return 'Node with ID "$repurposeNodeId" not found.'; }
         orchestrator.repurposeNode(repurposeNodeId, newClass);
         return 'Repurpose request sent for node ${node.name} ($repurposeNodeId) to ${newClass.name}.';
     }
@@ -266,50 +200,32 @@ Example response for "what is a node?":
         return 'Logs cleared.';
     }
 
-   // --- AI Command Processing ---
+   // AI Command Processing still returns AiCommandResult
    Future<AiCommandResult> processAiCommand(List<String> args) async {
         if (!geminiService.isApiKeySet()) {
-          // Instead of throwing, return a specific result for the UI layer
            return AiCommandResult(answerType: 'message', message: 'AI API Key not set. Please use: set_api_key <your_key>');
         }
         if (args.isEmpty) {
           return AiCommandResult(answerType: 'message', message: 'Usage: ai <your instruction for the ai>');
         }
-
         String userInstruction = args.join(' ');
-
         try {
-          Map<String, dynamic> aiResponse = await geminiService
-              .generateStructuredContent(userInstruction, systemPrompt);
-
+          Map<String, dynamic> aiResponse = await geminiService.generateStructuredContent(userInstruction, systemPrompt);
           String? answerType = aiResponse['answer_type'] as String?;
           List<dynamic>? instructionsDynamic = aiResponse['instructions'] as List<dynamic>?;
           String? message = aiResponse['message'] as String?;
 
           if (answerType == 'instructions') {
-             List<String> suggestedCommands = instructionsDynamic
-                    ?.map((item) => item.toString())
-                    .where((item) => item.isNotEmpty) // Filter out empty strings
-                    .toList() ?? [];
-              if (suggestedCommands.isEmpty) {
-                  return AiCommandResult(answerType: 'message', message: 'AI indicated instructions but provided none.');
-              }
-              return AiCommandResult(
-                  answerType: 'instructions',
-                  instructions: suggestedCommands,
-                  message: message);
+             List<String> suggestedCommands = instructionsDynamic?.map((item) => item.toString()).where((item) => item.isNotEmpty).toList() ?? [];
+              if (suggestedCommands.isEmpty) { return AiCommandResult(answerType: 'message', message: 'AI indicated instructions but provided none.'); }
+              return AiCommandResult(answerType: 'instructions', instructions: suggestedCommands, message: message);
           } else if (answerType == 'message') {
-              return AiCommandResult(
-                  answerType: 'message',
-                  message: message ?? "AI returned a message response with no content."); // Provide default if message is null
+              return AiCommandResult(answerType: 'message', message: message ?? "AI returned a message response with no content.");
           } else {
               return AiCommandResult(answerType: 'message', message: 'Error: Unknown or missing answer_type from AI response.');
           }
-
         } catch (e) {
-           // Return error as a message
            return AiCommandResult(answerType: 'message', message: 'Error interacting with AI service: $e');
         }
    }
-
 }
