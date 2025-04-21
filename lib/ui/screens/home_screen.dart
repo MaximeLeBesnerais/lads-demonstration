@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lads/ui/screens/ai_screen.dart';
 import 'package:lads/ui/screens/logs_screen.dart';
 import 'package:lads/ui/screens/nodes_screen.dart';
 import 'package:lads/ui/screens/tasks_screen.dart';
@@ -22,6 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
     NodesScreen(),
     TasksScreen(),
     LogsScreen(),
+    AiScreen()
   ];
 
   void _onItemTapped(int index) {
@@ -78,11 +80,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     label: Text('Logs'),
                   ),
                   // Add AI Destination if needed
-                  // NavigationRailDestination(
-                  //   icon: Icon(Icons.auto_awesome_outlined),
-                  //   selectedIcon: Icon(Icons.auto_awesome),
-                  //   label: Text('AI'),
-                  // ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.auto_awesome_outlined),
+                    selectedIcon: Icon(Icons.auto_awesome),
+                    label: Text('AI'),
+                  ),
                 ],
               ),
               const VerticalDivider(thickness: 1, width: 1), // Separator
